@@ -77,6 +77,16 @@ sqlcmd	-f 65001	sqlcmd -f 65001 -Q "..."
 gcloud	--quiet	gcloud run deploy --quiet
 Python	環境変数で対応	PYTHONUTF8=1
 
+### Windows ネイティブコマンドの回避
+
+Git Bash から Windows ネイティブコマンド（`where.exe`, `cmd.exe` 等）を実行すると、日本語エラーメッセージが cp932 で出力され文字化けする。Git Bash の同等コマンドを使うこと。
+
+| Windows コマンド | Git Bash 代替 |
+|-----------------|--------------|
+| `where` | `which` |
+| `dir` | `ls` |
+| `type` | `cat` |
+
 ---
 
 ## 利用可能なスキル
