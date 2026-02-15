@@ -1,3 +1,11 @@
+---
+name: start-req
+description: 新規REQを開始し、Phase 0を実行する
+user-invocable: true
+disable-model-invocation: true
+argument-hint: REQ-YYYY-NNN [Issue番号]
+---
+
 # /start-req コマンド
 
 新規REQを開始し、Phase 0を実行します。

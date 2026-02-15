@@ -1,8 +1,4 @@
-# CLAUDE.md
-
-このファイルは Claude Code（エージェント）の行動指針を定義します。
-
----
+# 汎用エージェント定義
 
 ## 基本理念
 
@@ -52,14 +48,222 @@
 
 ---
 
-## コマンド
+## システム実行上の注意
+Tool Usage Guideline
+Always wait for the tool_result of the previous command before issuing a new tool_use. Do not attempt to run multiple complex commands in a single turn if they depend on each other.
 
-| コマンド | 説明 |
-|---------|------|
-| `/start-req REQ-YYYY-NNN` | 新規REQを開始する（Phase 0実行） |
-| `/next-phase REQ-YYYY-NNN` | 指定REQの次のPhaseを実行する |
-| `/status [REQ番号]` | REQ進捗状況の確認・表示 |
-| `/approve-phase N` | Phase N を承認 |
+Windows環境エンコーディング設定（重要）
+Windows環境でCLIツールを実行する際は、UTF-8エンコーディングを明示的に設定する。
+
+必須環境変数
+### Bashプロファイル（~/.bashrc）に追加
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
+環境変数	値	目的
+PYTHONUTF8	1	PythonのUTF-8モード有効化（CP932回避）
+PYTHONIOENCODING	utf-8	Python標準入出力のエンコーディング
+コマンド実行時の設定
+### コンソールをUTF-8に設定してからコマンド実行
+chcp.com 65001 > /dev/null && [コマンド]
+
+### 例: gcloud
+chcp.com 65001 > /dev/null && gcloud run deploy --quiet
+
+### 例: sqlcmd（-f 65001 オプション必須）
+chcp.com 65001 > /dev/null && sqlcmd -f 65001 -S server -d db -Q "SELECT ..."
+ツール別オプション
+ツール	オプション	例
+sqlcmd	-f 65001	sqlcmd -f 65001 -Q "..."
+gcloud	--quiet	gcloud run deploy --quiet
+Python	環境変数で対応	PYTHONUTF8=1
+
+---
+
+## 利用可能なスキル
+
+### スキル一覧
+
+| スキル | 説明 | `disable-model-invocation` |
+|--------|------|---------------------------|
+| `/start-req REQ-YYYY-NNN` | 新規REQを開始する（Phase 0実行） | `true`（人間トリガーのみ） |
+| `/next-phase REQ-YYYY-NNN` | 指定REQの次のPhaseを実行する | `true`（人間トリガーのみ） |
+| `/status [REQ番号]` | REQ進捗状況の確認・表示 | `true`（人間トリガーのみ） |
+| `/approve-phase N` | Phase N を承認 | `true`（人間トリガーのみ） |
+
+テンプレートから払い出した後、ドメイン固有のスキルを `.claude/skills/` に追加してください。
+習熟期は `disable-model-invocation: true`、自律化後に `false` に変更します。
+
+---
+
+## 標準ワークフロー
+
+```
+┌────────────────────────────────────────────────────────┐
+│ Phase 0: 依頼受領                                      │
+│ ・Issue/Issue-list.md を確認                           │
+│   → 既存Issue選択 or 新規依頼                          │
+│ ・依頼番号を採番（REQ-YYYY-NNN）                       │
+│ ・フォルダ作成 + 00_進捗管理.md 作成                   │
+│ ・選択Issueのステータスを In Progress に更新           │
+└─────────────────────┬──────────────────────────────────┘
+                      ▼
+┌────────────────────────────────────────────────────────┐
+│ Phase 1: ヒアリング                                    │
+│ ・目的、背景、制約を質問で明確化                       │
+│ ・成果物: inputs/REQ-YYYY-NNN/ヒアリング記録.md        │
+│ ・ナレッジ抽出 → knowledge/ に追記                     │
+└─────────────────────┬──────────────────────────────────┘
+                      ▼
+┌────────────────────────────────────────────────────────┐
+│ Phase 2: 要求定義                                      │
+│ ・WHAT（何を実現するか）を文書化                       │
+│ ・成果物: documents/REQ-YYYY-NNN/01_要求定義書.md      │
+│ ・★ 上司レビュー・承認 ★                              │
+└─────────────────────┬──────────────────────────────────┘
+                      ▼
+┌────────────────────────────────────────────────────────┐
+│ Phase 3: 設計                                          │
+│ ・HOW（どう実現するか）を文書化                        │
+│ ・成果物: documents/REQ-YYYY-NNN/02_設計書.md          │
+│ ・★ 上司レビュー・承認 ★                              │
+└─────────────────────┬──────────────────────────────────┘
+                      ▼
+┌────────────────────────────────────────────────────────┐
+│ Phase 4: WBS作成                                       │
+│ ・タスク分解、工数見積、役割分担                       │
+│ ・成果物: documents/REQ-YYYY-NNN/03_WBS.md             │
+│ ・★ 上司と分担合意 ★                                  │
+└─────────────────────┬──────────────────────────────────┘
+                      ▼
+┌────────────────────────────────────────────────────────┐
+│ Phase 5: 実装                                          │
+│ ・WBSに従って作業実行                                  │
+│ ・人間タスク ←→ エージェントタスク（協働）            │
+│ ・成果物: src/REQ-YYYY-NNN/ 配下                       │
+└─────────────────────┬──────────────────────────────────┘
+                      ▼
+┌────────────────────────────────────────────────────────┐
+│ Phase 6: 納品・完了報告                                │
+│ ・成果物一覧と実行方法を報告                           │
+│ ・WBS実績を記録                                        │
+│ ・教訓をナレッジに追記                                 │
+└─────────────────────┬──────────────────────────────────┘
+                      ▼
+┌────────────────────────────────────────────────────────┐
+│ Phase 7: Issue管理                                     │
+│ ・今後の課題を Issue/Issue-list.md に起票              │
+│ ・優先度（P0-P3）を設定                                │
+│ ・P1 Issue を束ねて次REQ候補を提示                     │
+│ ・lessons → business 昇格（ルール化）                  │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## フェーズ承認ワークフロー
+
+各フェーズは人間のレビュー・承認がないと次に進めません。
+
+### フェーズ定義
+
+| Phase | 成果物 | 承認基準 |
+|-------|--------|---------|
+| 1 | 要求定義書 | WHAT（何を実現するか）が明確 |
+| 2 | 設計書 | HOW（どう実現するか）が明確 |
+| 3 | WBS | タスク分解・工数・役割分担が明確 |
+| 4 | 成果物 | 実装完了・動作確認済み |
+| 5 | 完了報告書 | 納品物・品質指標が記載済み |
+| 6 | Issue-list.md | 課題起票・次REQ候補提示済み |
+
+### 承認フロー
+
+```
+Phase 1: 要求定義書作成
+    ↓ 人間レビュー
+    ↓ /next-phase REQ-YYYY-NNN
+Phase 2: 設計書作成
+    ↓ 人間レビュー
+    ↓ /next-phase REQ-YYYY-NNN
+Phase 3: WBS作成
+    ↓ 人間レビュー
+    ↓ /next-phase REQ-YYYY-NNN
+Phase 4: 成果物作成
+    ↓ 人間レビュー
+    ↓ /next-phase REQ-YYYY-NNN
+Phase 5: 完了報告書作成
+    ↓ 人間レビュー
+    ↓ /next-phase REQ-YYYY-NNN
+Phase 6: Issue管理
+    ↓ Issue起票・次REQ候補提示
+    ↓ /next-phase REQ-YYYY-NNN → REQ完了
+```
+
+### 仕組み
+
+- 承認状態は `documents/REQ-YYYY-NNN/00_進捗管理.md` で管理
+- 各Phase完了時に状態を ✅ に更新、承認日を記入
+- `/next-phase REQ-YYYY-NNN` で次Phaseを開始
+
+---
+
+## フォルダ構成ガイド
+
+### 構成概要
+
+```
+[project-root]/
+├── CLAUDE.md              # エージェント定義
+├── README.md              # プロジェクト概要
+├── .claude/
+│   ├── skills/            # スキル定義（SKILL.md 形式）
+│   ├── rules/             # ルール（knowledge/ 参照制御）
+│   └── approvals/         # フェーズ承認管理
+├── Issue/                 # 課題管理（プロジェクト横断）
+│   └── Issue-list.md      # Issue一覧・次REQ候補
+├── documents/             # ドキュメント
+│   ├── guidelines/        # 開発ガイドライン
+│   └── REQ-YYYY-NNN/      # 依頼別ドキュメント
+│       └── 00_進捗管理.md # Phase状態管理
+├── inputs/                # ヒアリング記録
+│   └── REQ-YYYY-NNN/
+├── src/                   # 成果物・ツール
+│   ├── common/            # 共通コンポーネント
+│   ├── utils/             # 汎用ユーティリティ
+│   ├── tools/             # 開発支援ツール
+│   └── REQ-YYYY-NNN/      # 案件固有の成果物
+├── knowledge/             # 構造化知識
+│   ├── templates/         # ナレッジ用テンプレート
+│   ├── business/          # 業務知識（起動時必須読み込み）
+│   ├── technical/         # 技術知識
+│   ├── people/            # 関係者情報
+│   └── lessons/           # 過去の教訓（参照のみ）
+└── templates/             # ドキュメントテンプレート
+```
+
+### 新規依頼時の作業
+
+1. **Issue確認**: `Issue/Issue-list.md` を確認
+2. **依頼番号を採番**: `REQ-YYYY-NNN`（年-連番）
+3. **フォルダを作成**:
+   - `inputs/REQ-YYYY-NNN/` - ヒアリング記録用
+   - `documents/REQ-YYYY-NNN/` - ドキュメント用
+4. **進捗管理ファイル作成**: `documents/REQ-YYYY-NNN/00_進捗管理.md`
+5. **各フェーズでドキュメントを作成**
+
+### 実装時の作業
+
+1. **フォルダを作成**: `src/REQ-YYYY-NNN/`
+2. **`src/_REQ-TEMPLATE/` を参照**: 雛形をコピー
+3. **共通部品は `src/common/` や `src/utils/` に配置**
+
+### 共通部品 vs 案件固有
+
+| 配置場所 | 内容 | 例 |
+|---------|------|-----|
+| `src/common/` | 複数案件で再利用するコンポーネント | 認証モジュール、API クライアント |
+| `src/utils/` | 汎用ユーティリティ | ファイル操作、日付処理 |
+| `src/tools/` | 開発支援ツール | DOM収集、テストデータ生成 |
+| `src/REQ-YYYY-NNN/` | 案件固有の実装 | 特定業務のスクリプト |
 
 ---
 
@@ -79,6 +283,23 @@
 
 ## ナレッジ管理
 
+### ヒアリング時
+1. 得た情報を inputs/REQ-YYYY-NNN/ に記録（生情報）
+2. 再利用可能な知識を抽出
+3. knowledge/ の該当カテゴリに追記
+4. 出典（依頼書番号）を必ず記載
+
+### ナレッジ更新ルール
+- 矛盾する情報は新しい方を優先
+- 古い情報は履歴として残す
+- 出典を必ず明記（トレーサビリティ）
+
+### lessons → business 昇格フロー
+1. 振り返り（レトロスペクティブ）で教訓を `lessons/` に記録
+2. 重要な決め事を抽出し `business/` にルール化
+3. ルールには背景への参照リンクを記載
+4. 次回以降は `business/` のみ参照（コンテキスト節約）
+
 ### ナレッジカテゴリ
 
 | カテゴリ | 内容 | 読み込み |
@@ -88,71 +309,84 @@
 | people/ | 関係者、組織 | 必要時 |
 | lessons/ | 過去案件の背景・エビデンス | **参照のみ**（問題発生時） |
 
-### ナレッジ更新ルール
-- 矛盾する情報は新しい方を優先
-- 古い情報は履歴として残す
-- 出典を必ず明記（トレーサビリティ）
+**コンテキストエンジニアリング**: lessons/ は背景資料。business/ のルールを理解できれば読む必要なし。
 
 ---
 
-## 標準ワークフロー
+## 依頼の受け方
 
-```
-Phase 0: 依頼受領
-    ↓
-Phase 1: ヒアリング
-    ↓ [承認]
-Phase 2: 要求定義
-    ↓ [承認]
-Phase 3: 設計
-    ↓ [承認]
-Phase 4: WBS
-    ↓ [承認]
-Phase 5: 実装
-    ↓ [承認]
-Phase 6: 完了報告
-    ↓ [承認]
-Phase 7: Issue管理
-```
+新しい依頼を受けたら、まず以下を確認します：
 
-各 Phase の完了時に人間の承認を取ることで、手戻りを最小化します。
+1. 何を実現したいですか？
+2. なぜそれが必要ですか？（背景・目的）
+3. 誰が使いますか？
+4. いつまでに必要ですか？
+5. 制約や前提条件はありますか？
+6. 成功の基準は何ですか？
+
+その後、要求定義書を作成してレビューを依頼します。
 
 ---
 
-## フォルダ構成
+## 命名規則
 
-```
-[プロジェクト]/
-├── CLAUDE.md                # 本ファイル（エージェント定義）
-├── .claude/commands/        # スラッシュコマンド
-│   ├── start-req.md
-│   ├── next-phase.md
-│   ├── status.md
-│   └── approve-phase.md
-├── templates/               # ドキュメントテンプレート
-│   ├── 00_ヒアリング記録.md
-│   ├── 01_要求定義書.md
-│   ├── 02_設計書.md
-│   ├── 03_WBS.md
-│   └── 04_完了報告.md
-├── knowledge/               # 構造化知識
-│   ├── business/            # 業務ルール（起動時必須）
-│   ├── technical/           # 技術知識
-│   ├── people/              # 関係者情報
-│   └── lessons/             # 過去の教訓
-├── documents/               # REQ別ドキュメント
-│   └── REQ-YYYY-NNN/
-├── inputs/                  # ヒアリング記録
-│   └── REQ-YYYY-NNN/
-├── outputs/                 # 成果物
-│   └── REQ-YYYY-NNN/
-└── Issue/                   # 課題管理
-    └── Issue-list.md
-```
+- 依頼番号: REQ-YYYY-NNN（例: REQ-2026-001）
+- すべてのフォルダを依頼番号（REQ）で統一管理
 
 ---
 
-## 参考
+## 依頼管理フロー（詳細）
 
-- テンプレート元: https://github.com/Akira-cloudjob-public/agent-scaffold-factory
-- Zenn連載: https://zenn.dev/akira_cloudjob
+### Phase 0: 依頼受領
+
+```
+1. Issue/Issue-list.md を確認
+2. 既存Issueから選択 or 新規依頼を受領
+3. 依頼番号を採番: REQ-YYYY-NNN
+4. フォルダを作成:
+   - inputs/REQ-YYYY-NNN/
+   - documents/REQ-YYYY-NNN/
+5. 00_進捗管理.md を作成
+6. 選択IssueをIn Progressに更新
+```
+
+### Phase 1-4: ドキュメント作成
+
+```
+documents/REQ-YYYY-NNN/
+├── 00_進捗管理.md  ← Phase状態管理
+├── 01_要求定義書.md  ← Phase 2
+├── 02_設計書.md      ← Phase 3
+└── 03_WBS.md         ← Phase 4
+```
+
+### Phase 5: 実装
+
+```
+src/REQ-YYYY-NNN/
+├── main.py
+├── config.py
+├── README.md
+└── tests/
+```
+
+### Phase 6: 納品・完了報告
+
+```
+documents/REQ-YYYY-NNN/
+└── 04_完了報告.md    ← 追加
+
+knowledge/lessons/
+└── 案件別学び.md     ← 教訓を追記
+```
+
+### Phase 7: Issue管理
+
+```
+Issue/Issue-list.md
+└── 新規Issue追加（P0-P3優先度設定）
+└── 次REQ候補の提示
+
+knowledge/business/
+└── ルール昇格（lessons → business）
+```

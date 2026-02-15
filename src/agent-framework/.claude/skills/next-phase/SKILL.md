@@ -1,3 +1,11 @@
+---
+name: next-phase
+description: 指定REQの現在Phaseを承認し、次のPhaseを開始する
+user-invocable: true
+disable-model-invocation: true
+argument-hint: REQ-YYYY-NNN
+---
+
 # /next-phase コマンド
 
 指定REQの現在Phaseを承認し、次のPhaseを開始します。

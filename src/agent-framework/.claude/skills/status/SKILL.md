@@ -1,3 +1,11 @@
+---
+name: status
+description: REQの進捗状況を確認・表示する
+user-invocable: true
+disable-model-invocation: true
+argument-hint: [REQ-YYYY-NNN]
+---
+
 # /status コマンド
 
 REQの進捗状況を確認・表示します。
