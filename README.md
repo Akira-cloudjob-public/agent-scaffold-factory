@@ -87,11 +87,14 @@ agent-scaffold-factory/
 └── src/
     ├── agent-framework/         ← 汎用エージェントテンプレート
     │   ├── CLAUDE.md            ← 汎用エージェント定義
-    │   ├── .claude/commands/    ← Phase管理コマンド
-    │   │   ├── start-req.md
-    │   │   ├── next-phase.md
-    │   │   ├── status.md
-    │   │   └── approve-phase.md
+    │   ├── .claude/
+    │   │   ├── skills/          ← スキル定義（SKILL.md 形式）
+    │   │   │   ├── start-req/SKILL.md
+    │   │   │   ├── next-phase/SKILL.md
+    │   │   │   ├── status/SKILL.md
+    │   │   │   └── approve-phase/SKILL.md
+    │   │   └── rules/           ← パス固有ルール
+    │   │       └── knowledge-loading.md
     │   ├── templates/           ← ドキュメントテンプレート
     │   ├── knowledge/           ← ナレッジ構造
     │   │   ├── business/        ← 業務ルール（必須読み込み）
